@@ -16,7 +16,7 @@ app = Flask(__name__)
 CORS(app)
 
 # ----------------- Cấu hình MQTT -----------------
-MQTT_BROKER = "192.168.0.118"
+MQTT_BROKER = "192.168.1.41"
 MQTT_PORT = 1883
 MQTT_TOPIC = "img"
 
