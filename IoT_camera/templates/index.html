@@ -6,38 +6,41 @@
     <title>Giám Sát Cháy Rừng</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            background-color: #f4f4f4;
-        }
-        .container {
-            width: 80%;
-            margin: auto;
-            padding: 20px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-        }
-        img {
-            max-width: 100%;
-            height: auto;
-            border: 2px solid black;
-        }
-        canvas {
-            margin-top: 20px;
-        }
-        .status {
-            font-size: 24px;
-            font-weight: bold;
-        }
-        .safe {
-            color: green;
-        }
-        .fire {
-            color: red;
-        }
-    </style>
+    body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        background-color: #f4f4f4;
+    }
+    .container {
+        width: 80%;
+        margin: auto;
+        padding: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+    }
+    img {
+        max-width: 100%;
+        height: auto;
+        border: 2px solid black;
+    }
+    canvas {
+        margin-top: 20px;
+        width: 80% !important;   /* Điều chỉnh chiều rộng biểu đồ */
+        height: 300px !important; /* Điều chỉnh chiều cao biểu đồ */
+    }
+    .status {
+        font-size: 24px;
+        font-weight: bold;
+    }
+    .safe {
+        color: green;
+    }
+    .fire {
+        color: red;
+    }
+</style>
+
 </head>
 <body>
     <div class="container">
@@ -50,6 +53,9 @@
 
         <h3>Lịch sử phát hiện cháy</h3>
         <canvas id="fireChart"></canvas>
+
+        <h3>Số lần cháy theo tháng</h3>
+        <canvas id="fireChartMonthly"></canvas>
     </div>
 
     <script>
@@ -74,40 +80,181 @@
         }
 
         async function loadFireHistory() {
-            try {
-                let response = await fetch('/fire-history');
-                let data = await response.json();
+    try {
+        let response = await fetch('/fire-history');
+        let data = await response.json();
 
-                if (data.error) {
-                    console.error("Lỗi tải dữ liệu:", data.error);
-                    return;
-                }
-
-                const ctx = document.getElementById('fireChart').getContext('2d');
-
-                new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: data.times,
-                        datasets: [{
-                            label: 'Trạng thái cháy (1: Cháy, 0: Không cháy)',
-                            data: data.statuses,
-                            backgroundColor: data.statuses.map(status => status === 1 ? 'red' : 'blue'),
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        scales: {
-                            x: { ticks: { autoSkip: true, maxTicksLimit: 10 } },
-                            y: { beginAtZero: true, suggestedMax: 1 }
-                        }
-                    }
-                });
-            } catch (error) {
-                console.error("Lỗi khi tải biểu đồ:", error);
-            }
+        if (data.error) {
+            console.error("Lỗi tải dữ liệu:", data.error);
+            return;
         }
 
+        // Giới hạn dữ liệu trong 24 giờ (hoặc một khoảng thời gian khác)
+        const currentTime = new Date();
+        const dayAgo = new Date(currentTime.getTime() - 24 * 60 * 60 * 1000);  // Lấy dữ liệu trong 24 giờ qua
+        const filteredTimes = [];
+        const filteredStatuses = [];
+
+        // Lọc dữ liệu trong khoảng thời gian 24 giờ
+        data.times.forEach((time, index) => {
+            const recordTime = new Date(time);
+            if (recordTime >= dayAgo) {
+                filteredTimes.push(time);
+                filteredStatuses.push(data.statuses[index]);
+            }
+        });
+
+        // Biểu đồ lịch sử phát hiện cháy (bar chart)
+        const ctx = document.getElementById('fireChart').getContext('2d');
+        const fireChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: filteredTimes.map(time => {
+                    const date = new Date(time);
+                    return `${date.getHours()}:${date.getMinutes()}`;
+                }),
+                datasets: [{
+                    label: 'Trạng thái cháy (1: Cháy, 0: Không cháy)',
+                    data: filteredStatuses,
+                    backgroundColor: filteredStatuses.map(status => status === 1 ? 'rgba(255, 99, 132, 0.6)' : 'rgba(54, 162, 235, 0.6)'),
+                    borderColor: filteredStatuses.map(status => status === 1 ? 'rgba(255, 99, 132, 1)' : 'rgba(54, 162, 235, 1)'),
+                    borderWidth: 2,
+                    hoverBackgroundColor: filteredStatuses.map(status => status === 1 ? 'rgba(255, 99, 132, 0.8)' : 'rgba(54, 162, 235, 0.8)'),
+                    hoverBorderColor: filteredStatuses.map(status => status === 1 ? 'rgba(255, 99, 132, 1)' : 'rgba(54, 162, 235, 1)')
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        ticks: {
+                            autoSkip: true,
+                            maxTicksLimit: 8  // Giới hạn mốc thời gian trên trục X
+                        },
+                        title: {
+                            display: true,
+                            text: 'Thời gian (24 giờ)',
+                            font: { size: 14, weight: 'bold', family: 'Arial' },
+                            color: '#333'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        suggestedMax: 1,
+                        title: {
+                            display: true,
+                            text: 'Trạng thái cháy',
+                            font: { size: 14, weight: 'bold', family: 'Arial' },
+                            color: '#333'
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        callbacks: {
+                            label: function(tooltipItem) {
+                                return tooltipItem.raw === 1 ? 'Cháy' : 'Không cháy';
+                            }
+                        }
+                    }
+                },
+                elements: {
+                    bar: {
+                        borderRadius: 5
+                    }
+                },
+                animation: {
+                    duration: 1000,
+                    easing: 'easeInOutQuad'
+                }
+            }
+        });
+
+        // Biểu đồ cháy theo tháng (bar chart) - không thay đổi ở đây
+        const ctxMonthly = document.getElementById('fireChartMonthly').getContext('2d');
+        const months = [];
+        const monthlyFires = [];
+
+        // Tính số lần cháy trong mỗi tháng
+        data.times.forEach((time, index) => {
+            const date = new Date(time);
+            const month = `${date.getMonth() + 1}-${date.getFullYear()}`;
+            const status = data.statuses[index];
+
+            if (!months.includes(month)) {
+                months.push(month);
+                monthlyFires.push(status === 1 ? 1 : 0);  // Nếu cháy thì đếm 1
+            } else {
+                const monthIndex = months.indexOf(month);
+                if (status === 1) {
+                    monthlyFires[monthIndex]++;
+                }
+            }
+        });
+
+        const fireChartMonthly = new Chart(ctxMonthly, {
+            type: 'bar',
+            data: {
+                labels: months,
+                datasets: [{
+                    label: 'Số lần cháy theo tháng',
+                    data: monthlyFires,
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 2,
+                    hoverBackgroundColor: 'rgba(54, 162, 235, 0.8)',
+                    hoverBorderColor: 'rgba(54, 162, 235, 1)',
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        autoSkip: true,
+                        maxTicksLimit: 12,
+                        title: {
+                            display: true,
+                            text: 'Tháng',
+                            font: { size: 14, weight: 'bold', family: 'Arial' },
+                            color: '#333'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Số lần cháy',
+                            font: { size: 14, weight: 'bold', family: 'Arial' },
+                            color: '#333'
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        callbacks: {
+                            label: function(tooltipItem) {
+                                return tooltipItem.raw;
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    duration: 1000,
+                    easing: 'easeInOutQuad'
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error("Lỗi khi tải biểu đồ:", error);
+    }
+}
         setInterval(updateImage, 5000);
         setInterval(fetchLatestFireStatus, 5000);
         loadFireHistory();
