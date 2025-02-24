@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giám Sát Cháy Rừng</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+        }
+        .container {
+            width: 80%;
+            margin: auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid black;
+        }
+        canvas {
+            margin-top: 20px;
+        }
+        .status {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .safe {
+            color: green;
+        }
+        .fire {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Hệ Thống Giám Sát Cháy Rừng</h1>
+
+        <h3>Hình ảnh mới nhất từ camera:</h3>
+        <img id="latestImage" src="/latest-image" alt="Đang tải ảnh...">
+
+        <h3>Trạng thái cháy: <span id="fireStatus" class="status">Đang tải...</span></h3>
+
+        <h3>Lịch sử phát hiện cháy</h3>
+        <canvas id="fireChart"></canvas>
+    </div>
+
+    <script>
+        function updateImage() {
+            document.getElementById("latestImage").src = "/latest-image?" + new Date().getTime();
+        }
+
+        function fetchLatestFireStatus() {
+            fetch('/latest-fire-status')
+                .then(response => response.json())
+                .then(data => {
+                    let fireStatusElement = document.getElementById('fireStatus');
+                    if (data.fire_status === 1) {
+                        fireStatusElement.textContent = '🔥 Cháy!';
+                        fireStatusElement.className = 'status fire';
+                    } else {
+                        fireStatusElement.textContent = '✅ An toàn';
+                        fireStatusElement.className = 'status safe';
+                    }
+                })
+                .catch(error => console.error('Lỗi lấy trạng thái cháy:', error));
+        }
+
+        async function loadFireHistory() {
+            try {
+                let response = await fetch('/fire-history');
+                let data = await response.json();
+
+                if (data.error) {
+                    console.error("Lỗi tải dữ liệu:", data.error);
+                    return;
+                }
+
+                const ctx = document.getElementById('fireChart').getContext('2d');
+
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.times,
+                        datasets: [{
+                            label: 'Trạng thái cháy (1: Cháy, 0: Không cháy)',
+                            data: data.statuses,
+                            backgroundColor: data.statuses.map(status => status === 1 ? 'red' : 'blue'),
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            x: { ticks: { autoSkip: true, maxTicksLimit: 10 } },
+                            y: { beginAtZero: true, suggestedMax: 1 }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Lỗi khi tải biểu đồ:", error);
+            }
+        }
+
+        setInterval(updateImage, 5000);
+        setInterval(fetchLatestFireStatus, 5000);
+        loadFireHistory();
+    </script>
+</body>
+</html>
